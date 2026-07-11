@@ -11,10 +11,8 @@
 </head>
 <body data-fear="0">
 
-  <!-- Cursor personalizado -->
   <div id="cursor"></div>
 
-  <!-- Panel de opciones de sonido -->
   <div id="sound-panel" class="hidden">
     <button id="sound-panel-btn">SONIDO</button>
     <div class="sound-options">
@@ -25,10 +23,8 @@
     </div>
   </div>
 
-  <!-- Capa de glitch global -->
   <div id="glitch-layer"></div>
 
-  <!-- AVISO DE ENTRADA (desbloquea el audio) -->
   <div id="gate">
     <div class="gate-inner">
       <h1 class="gate-title">FOBIA</h1>
@@ -42,19 +38,16 @@
     </div>
   </div>
 
-  <!-- Latido visual (vignette que pulsa) -->
   <div id="heartbeat-vignette"></div>
 
   <main id="experience" class="hidden">
 
-    <!-- INTRO -->
     <header id="intro">
       <h2 class="intro-line">Todos le temen a algo.</h2>
       <h2 class="intro-line">Vamos a averiguar a qué le temes tú.</h2>
       <p class="scroll-hint">Desciende</p>
     </header>
 
-    <!-- ARACNOFOBIA -->
     <section id="aracno" class="fear-section" data-fear-id="1">
       <div class="fear-header">
         <span class="fear-tag">FOBIA 01</span>
@@ -70,14 +63,13 @@
       </div>
     </section>
 
-    <!-- NICTOFOBIA -->
     <section id="nicto" class="fear-section" data-fear-id="2">
       <div class="fear-header">
         <span class="fear-tag">FOBIA 02</span>
         <h2>Nictofobia</h2>
         <p class="fear-desc">
-          Tu linterna es vieja. Parpadea. Y en la oscuridad,
-          entre parpadeo y parpadeo, las cosas cambian de lugar.
+          Tu linterna es vieja. Parpadea. Y hay algo en esta habitación
+          que es más oscuro que la propia oscuridad.
         </p>
       </div>
       <div class="fear-stage">
@@ -86,31 +78,29 @@
       </div>
     </section>
 
-    <!-- TALASOFOBIA -->
     <section id="talaso" class="fear-section" data-fear-id="3">
       <div class="fear-header">
         <span class="fear-tag">FOBIA 03</span>
         <h2>Talasofobia</h2>
         <p class="fear-desc">
-          La superficie está cada vez más lejos. La luz no llega aquí abajo.
-          Pero tú no estás solo. Nunca estuviste solo.
+          Veinte kilómetros de agua negra. La luz murió hace mucho.
+          Lo que vive aquí abajo no necesita ojos. Pero los tiene.
         </p>
       </div>
       <div class="fear-stage tall">
         <canvas id="canvas-talaso"></canvas>
-        <div class="depth-meter"><span id="depth-value">0</span> m</div>
+        <div class="depth-meter"><span id="depth-value">0 m</span></div>
         <p class="stage-hint">Desliza dentro del agua para hundirte</p>
       </div>
     </section>
 
-    <!-- TRIPOFOBIA -->
     <section id="tripo" class="fear-section" data-fear-id="4">
       <div class="fear-header">
         <span class="fear-tag">FOBIA 04</span>
         <h2>Tripofobia</h2>
         <p class="fear-desc">
-          La superficie respira. Cada punto que tocas despierta
-          a los demás. Y quieren multiplicarse.
+          La superficie respira. Cada punto que tocas despierta a los demás.
+          Y cuando se tocan entre ellos... escucha.
         </p>
       </div>
       <div class="fear-stage">
@@ -119,14 +109,43 @@
       </div>
     </section>
 
-    <!-- CLAUSTROFOBIA (FINAL) -->
-    <section id="claustro" class="fear-section" data-fear-id="5">
+    <section id="escopo" class="fear-section" data-fear-id="5">
       <div class="fear-header">
         <span class="fear-tag">FOBIA 05</span>
+        <h2>Escopofobia</h2>
+        <p class="fear-desc">
+          Se abren cuando no los miras. Se cierran cuando te acercas.
+          Todos te siguen. Uno de ellos no debería estar ahí.
+        </p>
+      </div>
+      <div class="fear-stage">
+        <canvas id="canvas-escopo"></canvas>
+        <p class="stage-hint">Estás siendo observado</p>
+      </div>
+    </section>
+
+    <section id="espejo" class="fear-section" data-fear-id="6">
+      <div class="fear-header">
+        <span class="fear-tag">FOBIA 06</span>
+        <h2>Eisoptrofobia</h2>
+        <p class="fear-desc">
+          Tu reflejo te imita. Casi siempre. A veces se retrasa.
+          A veces se detiene. Y a veces hace algo que tú no hiciste.
+        </p>
+      </div>
+      <div class="fear-stage">
+        <canvas id="canvas-espejo"></canvas>
+        <p class="stage-hint">Muévete frente al espejo. Vigila tu reflejo.</p>
+      </div>
+    </section>
+
+    <section id="claustro" class="fear-section" data-fear-id="7">
+      <div class="fear-header">
+        <span class="fear-tag">FOBIA 07</span>
         <h2>Claustrofobia</h2>
         <p class="fear-desc">
-          Las paredes ya empezaron a moverse. Solo se detienen
-          si te mueves tú. ¿Cuánto tiempo puedes seguir moviéndote?
+          Las paredes te buscan a ti. Se agrietan, crujen, avanzan
+          hacia donde estés. Solo retroceden si te mueves.
         </p>
       </div>
       <div class="fear-stage">
@@ -135,7 +154,6 @@
       </div>
     </section>
 
-    <!-- SALIDA -->
     <footer id="exit">
       <h2>Puedes irte.</h2>
       <p>Pero ya sabes qué hay aquí abajo. Y eso no se olvida.</p>
@@ -144,19 +162,19 @@
 
   </main>
 
-  <!-- Librerías por CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lenis/1.1.13/lenis.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
 
-  <!-- Scripts propios -->
   <script src="js/main.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/aracno.js"></script>
   <script src="js/nicto.js"></script>
   <script src="js/talaso.js"></script>
   <script src="js/tripo.js"></script>
+  <script src="js/escopo.js"></script>
+  <script src="js/espejo.js"></script>
   <script src="js/claustro.js"></script>
 
 </body>

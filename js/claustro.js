@@ -1,4 +1,4 @@
-/* Claustrofobia — las paredes se cierran, crujen y se agrietan */
+/* Claustrofobia — las paredes te buscan a ti */
 (function () {
   const canvas = document.getElementById('canvas-claustro');
   const ctx = canvas.getContext('2d');
@@ -7,8 +7,9 @@
   let closure = 0;
   let lastMove = performance.now();
   let lastScrapeAt = 0;
-  let lastCrackLevel = 0;          // último umbral de crujido disparado
+  let lastCrackLevel = 0;
   const mouse = { x: 0.5, y: 0.5 };
+  const focus = { x: 0.5, y: 0.5 };   // punto al que convergen las paredes
 
   canvas.addEventListener('pointermove', e => {
     const r = canvas.getBoundingClientRect();
@@ -18,46 +19,44 @@
   });
   canvas.addEventListener('pointerdown', () => lastMove = performance.now());
 
-  function drawWallTexture(x0, y0, wW, wH, seedBase, cracks) {
-    ctx.strokeStyle = 'rgba(10, 9, 8, 0.65)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 7; i++) {
-      const seed = seedBase * 13.7 + i * 7.3;
-      let px = x0 + ((Math.sin(seed) + 1) / 2) * wW;
-      let py = y0;
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      for (let s = 0; s < 6; s++) {
-        px += Math.sin(seed * (s + 2)) * wW * 0.08;
-        py += wH / 6;
-        ctx.lineTo(px, py);
-      }
-      ctx.stroke();
+  // Grieta de fractura: trazo quebrado con núcleo oscuro y borde claro
+  function drawCrack(x0, y0, angle, len, seed, intensity) {
+    const pts = [{ x: x0, y: y0 }];
+    let x = x0, y = y0, a = angle;
+    const segs = 5 + Math.floor(intensity * 6);
+    for (let i = 0; i < segs; i++) {
+      a += Math.sin(seed * (i + 3)) * 0.55;
+      const step = len / segs;
+      x += Math.cos(a) * step;
+      y += Math.sin(a) * step;
+      pts.push({ x, y });
     }
 
-    // Grietas activas: más y más brillantes cuanto más se cierra
-    if (cracks > 0.05) {
-      const n = Math.floor(cracks * 9);
-      ctx.strokeStyle = `rgba(216, 211, 200, ${0.1 + cracks * 0.25})`;
-      ctx.lineWidth = 1.5;
-      for (let i = 0; i < n; i++) {
-        const seed = seedBase * 31.3 + i * 17.9;
-        let px = x0 + ((Math.sin(seed * 3) + 1) / 2) * wW;
-        let py = y0 + ((Math.cos(seed * 5) + 1) / 2) * wH * 0.5;
+    // Núcleo oscuro grueso
+    ctx.strokeStyle = `rgba(4, 3, 3, ${0.5 + intensity * 0.4})`;
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+
+    // Borde claro fino desplazado (la luz que entra por la fractura)
+    ctx.strokeStyle = `rgba(216, 211, 200, ${0.08 + intensity * 0.22})`;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x + 1.4, p.y + 1.4) : ctx.lineTo(p.x + 1.4, p.y + 1.4));
+    ctx.stroke();
+
+    // Ramas cortas
+    for (let i = 2; i < pts.length - 1; i++) {
+      if (Math.sin(seed * (i + 9)) > 0.5) {
+        const p = pts[i];
+        const ba = a + (Math.sin(seed * i) > 0 ? 1.1 : -1.1);
+        ctx.strokeStyle = `rgba(4, 3, 3, ${0.4 + intensity * 0.3})`;
+        ctx.lineWidth = 1.4;
         ctx.beginPath();
-        ctx.moveTo(px, py);
-        const segs = 3 + Math.floor(cracks * 5);
-        for (let s = 0; s < segs; s++) {
-          px += Math.sin(seed * (s + 7)) * wW * 0.12;
-          py += (Math.cos(seed * (s + 3)) * 0.4 + 0.6) * wH * 0.09;
-          ctx.lineTo(px, py);
-          // Ramificación
-          if (Math.sin(seed * (s + 11)) > 0.55) {
-            ctx.moveTo(px, py);
-            ctx.lineTo(px + Math.sin(seed * s) * wW * 0.07, py + wH * 0.05);
-            ctx.moveTo(px, py);
-          }
-        }
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x + Math.cos(ba) * len * 0.16, p.y + Math.sin(ba) * len * 0.16);
         ctx.stroke();
       }
     }
@@ -70,22 +69,29 @@
 
     const still = (performance.now() - lastMove) / 1000;
     if (still > 1.2) {
-      closure = Math.min(0.88, closure + 0.0016 + closure * 0.001);
+      closure = Math.min(0.9, closure + 0.0016 + closure * 0.001);
     } else {
       closure = Math.max(0, closure - 0.006);
     }
 
-    // Crujidos de pared al cruzar umbrales (0.2, 0.35, 0.5, 0.65, 0.8)
+    // Las paredes PERSIGUEN tu posición
+    focus.x += (mouse.x - focus.x) * 0.03;
+    focus.y += (mouse.y - focus.y) * 0.03;
+
     const crackLevel = Math.floor(closure / 0.15);
-    if (crackLevel > lastCrackLevel && window.terror) {
-      terror.crack(closure);
-    }
+    if (crackLevel > lastCrackLevel && window.terror) terror.crack(closure);
     lastCrackLevel = crackLevel;
 
     ctx.fillStyle = '#0d0c0a';
     ctx.fillRect(0, 0, w, h);
 
-    // La luz del "ocupante": se debilita y enrojece al cerrarse
+    // Hueco restante CENTRADO EN TU PUNTO
+    const openW = w * (1 - closure);
+    const openH = h * (1 - closure);
+    const ox = Math.max(0, Math.min(w - openW, focus.x * w - openW / 2));
+    const oy = Math.max(0, Math.min(h - openH, focus.y * h - openH / 2));
+
+    // La luz del ocupante (dentro del hueco)
     const px = mouse.x * w, py = mouse.y * h;
     const panic = closure > 0.55;
     const breathR = (14 + Math.sin(t * (0.004 + closure * 0.014)) * (4 + closure * 4)) * dpr;
@@ -104,36 +110,41 @@
     ctx.arc(px, py, breathR * 0.35, 0, Math.PI * 2);
     ctx.fill();
 
-    const wallX = (w / 2) * closure;
-    const wallY = (h / 2) * closure;
-
+    // Cuatro paredes alrededor del hueco
     ctx.fillStyle = '#181512';
-    ctx.fillRect(0, 0, wallX, h);
-    ctx.fillRect(w - wallX, 0, wallX, h);
-    ctx.fillRect(0, 0, w, wallY);
-    ctx.fillRect(0, h - wallY, w, wallY);
+    ctx.fillRect(0, 0, ox, h);                                // izquierda
+    ctx.fillRect(ox + openW, 0, w - ox - openW, h);           // derecha
+    ctx.fillRect(ox, 0, openW, oy);                           // arriba
+    ctx.fillRect(ox, oy + openH, openW, h - oy - openH);      // abajo
 
-    if (wallX > 4) {
-      drawWallTexture(0, 0, wallX, h, 1, closure);
-      drawWallTexture(w - wallX, 0, wallX, h, 2, closure);
-      ctx.fillStyle = 'rgba(216, 211, 200, 0.07)';
-      ctx.fillRect(wallX - 2 * dpr, 0, 2 * dpr, h);
-      ctx.fillRect(w - wallX, 0, 2 * dpr, h);
-    }
-    if (wallY > 4) {
-      drawWallTexture(0, 0, w, wallY, 3, closure);
-      drawWallTexture(0, h - wallY, w, wallY, 4, closure);
-      ctx.fillStyle = 'rgba(216, 211, 200, 0.07)';
-      ctx.fillRect(0, wallY - 2 * dpr, w, 2 * dpr);
-      ctx.fillRect(0, h - wallY, w, 2 * dpr);
+    // Bordes internos iluminados
+    ctx.fillStyle = 'rgba(216, 211, 200, 0.07)';
+    if (ox > 3) ctx.fillRect(ox - 2 * dpr, 0, 2 * dpr, h);
+    if (w - ox - openW > 3) ctx.fillRect(ox + openW, 0, 2 * dpr, h);
+    if (oy > 3) ctx.fillRect(ox, oy - 2 * dpr, openW, 2 * dpr);
+    if (h - oy - openH > 3) ctx.fillRect(ox, oy + openH, openW, 2 * dpr);
+
+    // Grietas de fractura: nacen en los bordes internos y crecen hacia afuera
+    if (closure > 0.08) {
+      const n = 2 + Math.floor(closure * 8);
+      for (let i = 0; i < n; i++) {
+        const seed = i * 13.7 + 3.1;
+        const side = i % 4;
+        let cx2, cy2, ang;
+        if (side === 0) { cx2 = ox; cy2 = (0.15 + (i / n) * 0.7) * h; ang = Math.PI; }
+        else if (side === 1) { cx2 = ox + openW; cy2 = (0.2 + (i / n) * 0.6) * h; ang = 0; }
+        else if (side === 2) { cx2 = ox + (0.15 + (i / n) * 0.7) * openW; cy2 = oy; ang = -Math.PI / 2; }
+        else { cx2 = ox + (0.2 + (i / n) * 0.6) * openW; cy2 = oy + openH; ang = Math.PI / 2; }
+        drawCrack(cx2, cy2, ang, (60 + closure * 140) * dpr, seed, closure);
+      }
     }
 
-    // Polvo cayendo de las paredes cuando crujen
+    // Polvo cayendo
     if (closure > 0.35) {
       ctx.fillStyle = `rgba(120, 105, 90, ${closure * 0.4})`;
       for (let i = 0; i < Math.floor(closure * 10); i++) {
-        const dx = wallX + Math.random() * (w - wallX * 2);
-        const dy = wallY + ((t * 0.1 + i * 137) % (h - wallY * 2));
+        const dx = ox + Math.random() * openW;
+        const dy = oy + ((t * 0.1 + i * 137) % openH);
         ctx.fillRect(dx, dy, 1.5 * dpr, 3 * dpr);
       }
     }

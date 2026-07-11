@@ -17,11 +17,13 @@
 
 /* Intensidad por sección activa */
 body[data-fear="0"] { --fear-level: 0; }
-body[data-fear="1"] { --fear-level: 0.3; }
-body[data-fear="2"] { --fear-level: 0.5; }
-body[data-fear="3"] { --fear-level: 0.6; }
-body[data-fear="4"] { --fear-level: 0.75; }
-body[data-fear="5"] { --fear-level: 1; }
+body[data-fear="1"] { --fear-level: 0.25; }
+body[data-fear="2"] { --fear-level: 0.4; }
+body[data-fear="3"] { --fear-level: 0.55; }
+body[data-fear="4"] { --fear-level: 0.65; }
+body[data-fear="5"] { --fear-level: 0.75; }
+body[data-fear="6"] { --fear-level: 0.88; }
+body[data-fear="7"] { --fear-level: 1; }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 

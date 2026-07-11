@@ -1,4 +1,4 @@
-/* Tripofobia — la superficie que respira y se toca a sí misma */
+/* Tripofobia — la superficie que respira y se frota consigo misma */
 (function () {
   const canvas = document.getElementById('canvas-tripo');
   const ctx = canvas.getContext('2d');
@@ -9,18 +9,15 @@
 
   function makeHole(x, y) {
     return {
-      x, y,
-      r: 0.001,
+      x, y, r: 0.001,
       born: performance.now(),
       phase: Math.random() * Math.PI * 2,
-      curR: 0            // radio actual en px (para colisiones)
+      px: 0, py: 0, curR: 0
     };
   }
 
   function seed() {
-    for (let i = 0; i < 14; i++) {
-      holes.push(makeHole(Math.random(), Math.random()));
-    }
+    for (let i = 0; i < 14; i++) holes.push(makeHole(Math.random(), Math.random()));
   }
   seed();
 
@@ -28,7 +25,6 @@
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width;
     const y = (e.clientY - rect.top) / rect.height;
-
     const n = 4 + Math.floor(Math.random() * 4);
     for (let i = 0; i < n; i++) {
       if (holes.length >= MAX_HOLES) holes.shift();
@@ -39,7 +35,7 @@
         Math.max(0.02, Math.min(0.98, y + Math.sin(a) * d))
       ));
     }
-    if (window.terror) { terror.pop(); terror.setTension(Math.min(1, holes.length / MAX_HOLES)); }
+    if (window.terror) { terror.squish(); terror.setTension(Math.min(1, holes.length / MAX_HOLES)); }
   });
 
   setInterval(() => {
@@ -55,25 +51,29 @@
     if (window.terror && Math.random() < 0.4) terror.pop();
   }, 1400);
 
-  // Detección de choques: cada 300 ms, no cada frame (rendimiento)
+  // FRICCIÓN CONTINUA: cuenta cuántos agujeros están en contacto y
+  // ajusta el volumen del roce de carne. Choques nuevos disparan squish.
+  let prevOverlaps = 0;
   setInterval(() => {
-    if (!vis.visible || !window.terror) return;
-    let collisions = 0;
-    // Solo una muestra aleatoria de pares (con 220 agujeros el total sería 24k pares)
-    for (let k = 0; k < 60; k++) {
-      const a = holes[Math.floor(Math.random() * holes.length)];
+    if (!vis.visible || !window.terror) { if (window.terror) terror.setFriction(0); return; }
+
+    let overlaps = 0;
+    const sample = Math.min(holes.length, 90);
+    for (let k = 0; k < sample; k++) {
+      const a = holes[(k * 7) % holes.length];
       const b = holes[Math.floor(Math.random() * holes.length)];
       if (!a || !b || a === b) continue;
-      const dx = a.px - b.px, dy = a.py - b.py;
-      const dd = Math.hypot(dx, dy);
-      if (dd > 0 && dd < (a.curR + b.curR)) collisions++;
+      const dd = Math.hypot(a.px - b.px, a.py - b.py);
+      if (dd > 0 && dd < (a.curR + b.curR)) overlaps++;
     }
-    // Cuantos más choques (superficies frotándose), más suena la carne
-    if (collisions > 0) {
-      terror.squish();
-      if (collisions > 4) setTimeout(() => terror.squish(), 260);
-    }
-  }, 300);
+
+    // El roce respira: sube con los contactos, modulado por la "respiración" global
+    terror.setFriction(Math.min(1, overlaps / 12));
+
+    // Choques NUEVOS (subida brusca de contactos): golpe húmedo
+    if (overlaps > prevOverlaps + 2) terror.squish();
+    prevOverlaps = overlaps;
+  }, 280);
 
   function loop(t) {
     if (!vis.visible) { requestAnimationFrame(loop); return; }
@@ -107,7 +107,7 @@
       const R = Math.max(0.001, (0.008 + grow * 0.024)) * Math.min(w, h) * breath;
 
       const hx = hole.x * w, hy = hole.y * h;
-      hole.px = hx; hole.py = hy; hole.curR = R * 1.3;   // guarda para colisiones
+      hole.px = hx; hole.py = hy; hole.curR = R * 1.3;
 
       const rim = ctx.createRadialGradient(hx, hy, R * 0.55, hx, hy, R * 1.6);
       rim.addColorStop(0, 'rgba(0, 0, 0, 0)');

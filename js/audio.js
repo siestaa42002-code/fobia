@@ -1,7 +1,5 @@
 /* ============================================
    audio.js — Motor de terror procedural (Tone.js)
-   Buses: general, latido, ambiente, efectos.
-   API global: window.terror
    ============================================ */
 (function () {
   let ready = false;
@@ -10,6 +8,7 @@
   let dirty = false;
 
   const vignette = document.getElementById('heartbeat-vignette');
+  const busLevels = { general: 1, latido: 1, ambiente: 1, efectos: 1 };
 
   let master, heartGain, ambGain, fxGain, reverb;
   let heart, heartLoop;
@@ -17,19 +16,18 @@
   let noise, noiseFilter, noiseGain;
   let skitterSynth, whisperNoise, subHit, metalSynth, sonarSynth, popSynth;
   let squishNoise, squishFilter, crackNoise;
+  let frictionNoise, frictionFilter, frictionGain, frictionLFO;
 
   async function init() {
     if (ready) return;
     await Tone.start();
 
-    /* --- Buses --- */
     master = new Tone.Gain(0.9).toDestination();
     heartGain = new Tone.Gain(1).connect(master);
     ambGain = new Tone.Gain(1).connect(master);
     fxGain = new Tone.Gain(1).connect(master);
     reverb = new Tone.Reverb({ decay: 7, wet: 0.45 }).connect(fxGain);
 
-    /* --- Latido --- */
     heart = new Tone.MembraneSynth({
       pitchDecay: 0.12, octaves: 3,
       envelope: { attack: 0.001, decay: 0.35, sustain: 0 },
@@ -48,7 +46,6 @@
     heartLoop.start(0);
     Tone.Transport.start();
 
-    /* --- Ambiente --- */
     droneGain = new Tone.Gain(0).connect(ambGain);
     droneFilter = new Tone.Filter(90, 'lowpass').connect(droneGain);
     droneSynth = new Tone.PolySynth(Tone.Synth, {
@@ -63,7 +60,6 @@
     noise = new Tone.Noise('brown').connect(noiseFilter);
     noise.start();
 
-    /* --- Efectos --- */
     skitterSynth = new Tone.NoiseSynth({
       noise: { type: 'white' },
       envelope: { attack: 0.001, decay: 0.025, sustain: 0 },
@@ -101,15 +97,24 @@
       volume: -16
     }).connect(reverb);
 
-    // Carne: ruido rosado grave, filtrado bajo, con "resbalón" de tono
+    // Golpe de carne (impacto puntual)
     squishFilter = new Tone.Filter(260, 'lowpass').connect(fxGain);
     squishNoise = new Tone.NoiseSynth({
       noise: { type: 'pink' },
       envelope: { attack: 0.012, decay: 0.22, sustain: 0, release: 0.1 },
-      volume: -14
+      volume: -11
     }).connect(squishFilter);
 
-    // Pared quebrándose: estallido de ruido seco
+    // Fricción de carne CONTINUA: ruido marrón grave con filtro ondulante.
+    // Suena mientras las superficies estén en contacto (setFriction > 0).
+    frictionGain = new Tone.Gain(0).connect(fxGain);
+    frictionFilter = new Tone.Filter(180, 'lowpass').connect(frictionGain);
+    frictionNoise = new Tone.Noise('brown').connect(frictionFilter);
+    frictionNoise.start();
+    frictionLFO = new Tone.LFO(0.6, 110, 340);
+    frictionLFO.connect(frictionFilter.frequency);
+    frictionLFO.start();
+
     crackNoise = new Tone.NoiseSynth({
       noise: { type: 'white' },
       envelope: { attack: 0.001, decay: 0.28, sustain: 0, release: 0.05 },
@@ -126,7 +131,7 @@
 
   function apply() {
     if (!ready) return;
-    const f = Math.min(1, level / 5 + tension * 0.35);
+    const f = Math.min(1, level / 7 + tension * 0.35);
 
     heartLoop.interval = Math.max(0.43, 1.1 - f * 0.67);
     heart.volume.rampTo(-13 + f * 5, 0.5);
@@ -138,16 +143,24 @@
     noiseFilter.frequency.rampTo(400 + f * 900, 2);
   }
 
-  let lastSkitter = 0, lastWhisper = 0, lastPop = 0, lastScrape = 0, lastSquish = 0, lastCrack = 0;
+  /* --- Pausa total al salir de la pestaña --- */
+  document.addEventListener('visibilitychange', () => {
+    if (!ready) return;
+    if (document.hidden) {
+      Tone.Transport.pause();
+      master.gain.rampTo(0, 0.15);
+    } else {
+      Tone.Transport.start();
+      master.gain.rampTo(0.9 * busLevels.general, 0.6);
+    }
+  });
+
+  let lastSkitter = 0, lastWhisper = 0, lastPop = 0, lastScrape = 0, lastSquish = 0, lastCrack = 0, lastBlink = 0;
 
   window.terror = {
     init,
 
-    setLevel(l) {
-      level = l;
-      tension = 0;
-      dirty = true;
-    },
+    setLevel(l) { level = l; tension = 0; dirty = true; },
 
     setTension(t) {
       const nt = Math.max(0, Math.min(1, t));
@@ -161,8 +174,15 @@
       const buses = { general: master, latido: heartGain, ambiente: ambGain, efectos: fxGain };
       const bus = buses[name];
       if (!bus) return;
+      busLevels[name] = v;
       const base = name === 'general' ? 0.9 : 1;
       bus.gain.rampTo(v * base, 0.3);
+    },
+
+    // Nivel de fricción de carne continuo (0..1)
+    setFriction(v) {
+      if (!ready) return;
+      frictionGain.gain.rampTo(Math.max(0, Math.min(1, v)) * 0.55, 0.25);
     },
 
     skitter(intensity = 0.5) {
@@ -174,6 +194,16 @@
       for (let i = 0; i < n; i++) {
         skitterSynth.triggerAttackRelease('64n', now + i * (0.03 + Math.random() * 0.04));
       }
+    },
+
+    // Parpadeo de ojos: chasquido suave
+    blink() {
+      if (!ready) return;
+      const now = Tone.now();
+      if (now - lastBlink < 0.3) return;
+      lastBlink = now;
+      skitterSynth.triggerAttackRelease('32n', now);
+      skitterSynth.triggerAttackRelease('64n', now + 0.06);
     },
 
     whisper() {
@@ -211,7 +241,6 @@
       popSynth.triggerAttackRelease(70 + Math.random() * 90, '16n');
     },
 
-    // Carne chocando / frotándose: doble golpe húmedo con filtro variable
     squish() {
       if (!ready) return;
       const now = Tone.now();
@@ -223,7 +252,6 @@
       popSynth.triggerAttackRelease(55 + Math.random() * 30, '16n', now + 0.02);
     },
 
-    // Pared quebrándose: crujidos secos escalonados + golpe grave
     crack(intensity = 0.5) {
       if (!ready) return;
       const now = Tone.now();
@@ -243,12 +271,9 @@
     }
   };
 
-  /* ---------- Panel de opciones ---------- */
   const panel = document.getElementById('sound-panel');
   const panelBtn = document.getElementById('sound-panel-btn');
-
   panelBtn.addEventListener('click', () => panel.classList.toggle('open'));
-
   document.querySelectorAll('#sound-panel input[type="range"]').forEach(s => {
     s.addEventListener('input', () => terror.setBus(s.dataset.bus, s.value / 100));
   });

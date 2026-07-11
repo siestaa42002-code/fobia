@@ -1,4 +1,4 @@
-/* Aracnofobia — arañas procedurales que acechan al cursor quieto */
+/* Aracnofobia — arañas que acechan en embestidas */
 (function () {
   const canvas = document.getElementById('canvas-aracno');
   const ctx = canvas.getContext('2d');
@@ -7,17 +7,17 @@
   const mouse = { x: 0.5, y: 0.5, inside: false };
   let lastMove = 0;
 
-  const SPIDERS = 5;
   const spiders = [];
-
-  for (let i = 0; i < SPIDERS; i++) {
+  for (let i = 0; i < 5; i++) {
     spiders.push({
       x: 0.15 + Math.random() * 0.7, y: 0.15 + Math.random() * 0.7,
       angle: Math.random() * Math.PI * 2,
       speed: 0,
       size: 10 + Math.random() * 14,
       legPhase: Math.random() * Math.PI * 2,
-      jitterT: 0
+      jitterT: 0,
+      lungeT: Math.floor(Math.random() * 60),   // ciclo embestida/pausa
+      lunging: false
     });
   }
 
@@ -28,6 +28,7 @@
     mouse.inside = true;
     lastMove = performance.now();
   });
+  canvas.addEventListener('pointerenter', () => lastMove = performance.now());
   canvas.addEventListener('pointerleave', () => mouse.inside = false);
 
   function drawSpider(s, w, h, dpr, threat) {
@@ -70,8 +71,8 @@
     ctx.ellipse(0, -size * 0.28, size * 0.3, size * 0.34, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    if (threat > 0.55) {
-      ctx.fillStyle = `rgba(196, 20, 20, ${(threat - 0.55) * 2.2})`;
+    if (threat > 0.4) {
+      ctx.fillStyle = `rgba(196, 20, 20, ${(threat - 0.4) * 1.6})`;
       ctx.beginPath();
       ctx.arc(-size * 0.09, -size * 0.36, size * 0.05, 0, Math.PI * 2);
       ctx.arc(size * 0.09, -size * 0.36, size * 0.05, 0, Math.PI * 2);
@@ -110,16 +111,28 @@
       const dx = mouse.x - s.x, dy = mouse.y - s.y;
       const dist = Math.hypot(dx, dy);
 
-      if (mouse.inside && still > 0.15) {
+      if (mouse.inside && still > 0.08) {
+        // ACECHO EN EMBESTIDAS: pausa → carrera corta hacia ti → pausa
         const targetA = Math.atan2(dy, dx);
         let da = targetA - s.angle;
         while (da > Math.PI) da -= Math.PI * 2;
         while (da < -Math.PI) da += Math.PI * 2;
-        s.angle += da * 0.04;
-        s.speed = 0.00025 + still * 0.0011;
+        s.angle += da * 0.09;
+
+        s.lungeT--;
+        if (s.lungeT <= 0) {
+          s.lunging = !s.lunging;
+          // Embestida: 15-25 frames; pausa: 30-80 frames (más corta si estás muy quieto)
+          s.lungeT = s.lunging
+            ? 15 + Math.floor(Math.random() * 10)
+            : Math.floor((30 + Math.random() * 50) * (1.2 - still));
+          if (s.lunging && dist < 0.35 && window.terror) terror.skitter(0.6);
+        }
+        s.speed = s.lunging ? 0.0035 + still * 0.002 : 0.0002;
       } else if (mouse.inside && dist < 0.3) {
         s.angle = Math.atan2(-dy, -dx) + (Math.random() - 0.5) * 0.6;
         s.speed = 0.004;
+        s.lunging = false;
         if (dist < 0.2 && window.terror) terror.skitter(0.8);
       } else {
         s.jitterT -= 1;
@@ -127,13 +140,12 @@
           s.angle += (Math.random() - 0.5) * 1.4;
           s.jitterT = 40 + Math.random() * 100;
         }
-        s.speed = 0.0006 + Math.random() * 0.0003;   // nunca cero
+        s.speed = 0.0006 + Math.random() * 0.0003;
       }
 
       s.x += Math.cos(s.angle) * s.speed;
       s.y += Math.sin(s.angle) * s.speed;
 
-      // REBOTE en los bordes: refleja el ángulo (antes se quedaban clavadas)
       if (s.x <= 0.03 || s.x >= 0.97) {
         s.angle = Math.PI - s.angle + (Math.random() - 0.5) * 0.5;
         s.x = Math.max(0.031, Math.min(0.969, s.x));
@@ -146,10 +158,9 @@
       }
 
       s.legPhase += 0.12 + s.speed * 90;
-
       if (dist < 0.12) anyClose = true;
 
-      const threat = still * Math.max(0, 1 - dist * 2.5);
+      const threat = Math.max(still, s.lunging ? 0.5 : 0) * Math.max(0, 1 - dist * 2.2);
       drawSpider(s, w, h, dpr, threat);
     }
 

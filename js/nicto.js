@@ -1,4 +1,4 @@
-/* Nictofobia — linterna moribunda y el ente que huye de la luz */
+/* Nictofobia — la sombra que es más oscura que la oscuridad */
 (function () {
   const canvas = document.getElementById('canvas-nicto');
   const ctx = canvas.getContext('2d');
@@ -6,29 +6,23 @@
 
   const mouse = { x: 0.5, y: 0.5, inside: false };
 
-  const NUM = 9;
   let objects = [];
   function scatter() {
     objects = [];
-    for (let i = 0; i < NUM; i++) {
+    for (let i = 0; i < 9; i++) {
       objects.push({
         x: 0.08 + Math.random() * 0.84,
         y: 0.12 + Math.random() * 0.76,
-        type: Math.floor(Math.random() * 2),   // solo sillas y marcos
-        seen: false
+        type: Math.floor(Math.random() * 2)
       });
     }
   }
   scatter();
 
-  // EL ENTE: siempre existe, huye cuando la luz lo encuentra
-  const entity = {
-    x: 0.8, y: 0.5,
-    found: 0          // cuántas veces lo has encontrado
-  };
+  const entity = { x: 0.8, y: 0.5 };
+  let entityCooldown = 0;
 
   function relocateEntity() {
-    // Se teletransporta lejos del cursor
     let nx, ny, tries = 0;
     do {
       nx = 0.08 + Math.random() * 0.84;
@@ -37,12 +31,10 @@
     } while (Math.hypot(nx - mouse.x, ny - mouse.y) < 0.45 && tries < 20);
     entity.x = nx;
     entity.y = ny;
-    entity.found++;
   }
 
   let flicker = 1;
   let blackoutUntil = 0;
-  let entityCooldown = 0;
 
   canvas.addEventListener('pointermove', e => {
     const r = canvas.getBoundingClientRect();
@@ -76,13 +68,12 @@
     }
   }
 
-  // El ente: sombra humanoide MÁS OSCURA que la oscuridad
   function drawEntity(w, h, dpr, alpha) {
     const x = entity.x * w, y = entity.y * h;
-    const s = 34 * dpr;
+    const s = 36 * dpr;
 
-    // Silueta que absorbe la luz
-    ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(0.95, alpha * 1.6)})`;
+    // Silueta NEGRA PURA: recorta la luz que hay detrás
+    ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1, alpha * 2)})`;
     ctx.beginPath();
     ctx.arc(x, y - s * 1.15, s * 0.34, 0, Math.PI * 2);
     ctx.fill();
@@ -93,10 +84,14 @@
     ctx.closePath();
     ctx.fill();
 
-    // Contorno apenas visible: la luz "no se le pega"
-    ctx.strokeStyle = `rgba(90, 80, 75, ${alpha * 0.5})`;
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    // Dos puntos rojos tenues: te está mirando
+    if (alpha > 0.2) {
+      ctx.fillStyle = `rgba(160, 15, 15, ${(alpha - 0.2) * 1.1})`;
+      ctx.beginPath();
+      ctx.arc(x - s * 0.1, y - s * 1.18, s * 0.05, 0, Math.PI * 2);
+      ctx.arc(x + s * 0.1, y - s * 1.18, s * 0.05, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function loop(t) {
@@ -110,8 +105,7 @@
     if (t > blackoutUntil) {
       flicker = 1;
       if (Math.random() < 0.006) {
-        const dur = 250 + Math.random() * 900;
-        blackoutUntil = t + dur;
+        blackoutUntil = t + 250 + Math.random() * 900;
         flicker = 0;
         scatter();
         relocateEntity();
@@ -128,39 +122,40 @@
     }
 
     const mx = mouse.x * w, my = mouse.y * h;
-    const R = 120 * dpr * (0.85 + Math.sin(t * 0.01) * 0.08) * flicker;
+    const R = 130 * dpr * (0.85 + Math.sin(t * 0.01) * 0.08) * flicker;
 
     if (mouse.inside && R > 1) {
+      // 1. LA LUZ PRIMERO: ilumina el fondo
+      const g = ctx.createRadialGradient(mx, my, 0, mx, my, R);
+      g.addColorStop(0, `rgba(190, 175, 145, ${0.32 * flicker})`);
+      g.addColorStop(0.55, `rgba(190, 175, 145, ${0.1 * flicker})`);
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+
+      // 2. Los objetos, sobre el fondo iluminado
       for (const o of objects) {
         const d = Math.hypot(o.x * w - mx, o.y * h - my);
         const alpha = Math.max(0, 1 - d / R);
         if (alpha > 0.03) drawObject(o, w, h, dpr, alpha);
       }
 
-      // EL ENTE: si la luz lo alcanza, se deja ver un instante y huye
+      // 3. EL ENTE: negro puro que recorta la luz (ahora sí visible)
       const de = Math.hypot(entity.x * w - mx, entity.y * h - my);
-      const ea = Math.max(0, 1 - de / (R * 1.15));
+      const ea = Math.max(0, 1 - de / (R * 1.25));
       if (ea > 0.03) {
         drawEntity(w, h, dpr, ea);
-        if (ea > 0.45 && t > entityCooldown) {
-          entityCooldown = t + 900;         // no puede huir en cadena
+        if (ea > 0.5 && t > entityCooldown) {
+          entityCooldown = t + 1000;
           if (window.terror) {
             terror.hit();
             terror.whisper();
             terror.setTension(1);
           }
           window.setCursorTense && setCursorTense(true);
-          // Huye DESPUÉS de dejarse ver un instante
-          setTimeout(relocateEntity, 180);
+          setTimeout(relocateEntity, 220);   // se deja ver un instante y huye
         }
       }
-
-      const g = ctx.createRadialGradient(mx, my, 0, mx, my, R);
-      g.addColorStop(0, `rgba(235, 225, 200, ${0.14 * flicker})`);
-      g.addColorStop(0.6, `rgba(235, 225, 200, ${0.05 * flicker})`);
-      g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
     }
 
     requestAnimationFrame(loop);
