@@ -1,4 +1,4 @@
-/* Claustrofobia — las paredes te buscan a ti */
+/* Claustrofobia — la puerta: sobrevive y recibe la pista */
 (function () {
   const canvas = document.getElementById('canvas-claustro');
   const ctx = canvas.getContext('2d');
@@ -8,8 +8,10 @@
   let lastMove = performance.now();
   let lastScrapeAt = 0;
   let lastCrackLevel = 0;
+  let blackoutUntil = 0;         // ciclo de "muerte" al cerrarse del todo
+  let survived = 0;
   const mouse = { x: 0.5, y: 0.5 };
-  const focus = { x: 0.5, y: 0.5 };   // punto al que convergen las paredes
+  const focus = { x: 0.5, y: 0.5 };
 
   canvas.addEventListener('pointermove', e => {
     const r = canvas.getBoundingClientRect();
@@ -19,7 +21,6 @@
   });
   canvas.addEventListener('pointerdown', () => lastMove = performance.now());
 
-  // Grieta de fractura: trazo quebrado con núcleo oscuro y borde claro
   function drawCrack(x0, y0, angle, len, seed, intensity) {
     const pts = [{ x: x0, y: y0 }];
     let x = x0, y = y0, a = angle;
@@ -32,7 +33,6 @@
       pts.push({ x, y });
     }
 
-    // Núcleo oscuro grueso
     ctx.strokeStyle = `rgba(4, 3, 3, ${0.5 + intensity * 0.4})`;
     ctx.lineWidth = 2.4;
     ctx.lineCap = 'round';
@@ -40,14 +40,12 @@
     pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
     ctx.stroke();
 
-    // Borde claro fino desplazado (la luz que entra por la fractura)
     ctx.strokeStyle = `rgba(216, 211, 200, ${0.08 + intensity * 0.22})`;
     ctx.lineWidth = 0.9;
     ctx.beginPath();
     pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x + 1.4, p.y + 1.4) : ctx.lineTo(p.x + 1.4, p.y + 1.4));
     ctx.stroke();
 
-    // Ramas cortas
     for (let i = 2; i < pts.length - 1; i++) {
       if (Math.sin(seed * (i + 9)) > 0.5) {
         const p = pts[i];
@@ -67,14 +65,41 @@
 
     const { w, h, dpr } = fitCanvas(canvas);
 
-    const still = (performance.now() - lastMove) / 1000;
-    if (still > 1.2) {
-      closure = Math.min(0.9, closure + 0.0016 + closure * 0.001);
-    } else {
-      closure = Math.max(0, closure - 0.006);
+    // Ciclo de apagón: si te encerró, oscuridad total 2 s con mensaje, y renace
+    if (t < blackoutUntil) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, w, h);
+      const breathe = 0.3 + Math.abs(Math.sin(t * 0.003)) * 0.35;
+      ctx.font = `${14 * dpr}px 'Special Elite', cursive`;
+      ctx.fillStyle = `rgba(160, 20, 20, ${breathe})`;
+      const msg = survived >= 1
+        ? 'LO QUE BUSCAS SE ESCRIBE AL FINAL DEL DESCENSO'
+        : 'TE LO ADVERTIMOS. NO TE QUEDES QUIETO.';
+      ctx.fillText(msg, w / 2 - msg.length * 3.6 * dpr, h / 2);
+      requestAnimationFrame(loop);
+      return;
     }
 
-    // Las paredes PERSIGUEN tu posición
+    const still = (performance.now() - lastMove) / 1000;
+    if (still > 1.2) {
+      closure = Math.min(1, closure + 0.0016 + closure * 0.001);
+    } else {
+      closure = Math.max(0, closure - 0.011);   // retroceso más rápido (antes se sentía atascado)
+    }
+
+    // Cierre total: apagón, golpe, reinicio limpio
+    if (closure >= 0.96) {
+      survived++;
+      blackoutUntil = t + 2400;
+      closure = 0.2;
+      lastMove = performance.now();
+      lastCrackLevel = 0;
+      if (window.terror) { terror.hit(); terror.crack(1); terror.whisper(); }
+      if (window.glitchFlash) glitchFlash();
+      requestAnimationFrame(loop);
+      return;
+    }
+
     focus.x += (mouse.x - focus.x) * 0.03;
     focus.y += (mouse.y - focus.y) * 0.03;
 
@@ -85,13 +110,11 @@
     ctx.fillStyle = '#0d0c0a';
     ctx.fillRect(0, 0, w, h);
 
-    // Hueco restante CENTRADO EN TU PUNTO
     const openW = w * (1 - closure);
     const openH = h * (1 - closure);
     const ox = Math.max(0, Math.min(w - openW, focus.x * w - openW / 2));
     const oy = Math.max(0, Math.min(h - openH, focus.y * h - openH / 2));
 
-    // La luz del ocupante (dentro del hueco)
     const px = mouse.x * w, py = mouse.y * h;
     const panic = closure > 0.55;
     const breathR = (14 + Math.sin(t * (0.004 + closure * 0.014)) * (4 + closure * 4)) * dpr;
@@ -110,21 +133,18 @@
     ctx.arc(px, py, breathR * 0.35, 0, Math.PI * 2);
     ctx.fill();
 
-    // Cuatro paredes alrededor del hueco
     ctx.fillStyle = '#181512';
-    ctx.fillRect(0, 0, ox, h);                                // izquierda
-    ctx.fillRect(ox + openW, 0, w - ox - openW, h);           // derecha
-    ctx.fillRect(ox, 0, openW, oy);                           // arriba
-    ctx.fillRect(ox, oy + openH, openW, h - oy - openH);      // abajo
+    ctx.fillRect(0, 0, ox, h);
+    ctx.fillRect(ox + openW, 0, w - ox - openW, h);
+    ctx.fillRect(ox, 0, openW, oy);
+    ctx.fillRect(ox, oy + openH, openW, h - oy - openH);
 
-    // Bordes internos iluminados
     ctx.fillStyle = 'rgba(216, 211, 200, 0.07)';
     if (ox > 3) ctx.fillRect(ox - 2 * dpr, 0, 2 * dpr, h);
     if (w - ox - openW > 3) ctx.fillRect(ox + openW, 0, 2 * dpr, h);
     if (oy > 3) ctx.fillRect(ox, oy - 2 * dpr, openW, 2 * dpr);
     if (h - oy - openH > 3) ctx.fillRect(ox, oy + openH, openW, 2 * dpr);
 
-    // Grietas de fractura: nacen en los bordes internos y crecen hacia afuera
     if (closure > 0.08) {
       const n = 2 + Math.floor(closure * 8);
       for (let i = 0; i < n; i++) {
@@ -139,7 +159,6 @@
       }
     }
 
-    // Polvo cayendo
     if (closure > 0.35) {
       ctx.fillStyle = `rgba(120, 105, 90, ${closure * 0.4})`;
       for (let i = 0; i < Math.floor(closure * 10); i++) {

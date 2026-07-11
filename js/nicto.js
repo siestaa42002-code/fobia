@@ -1,4 +1,4 @@
-/* Nictofobia — la sombra que es más oscura que la oscuridad */
+/* Nictofobia — letra A: ilumina al ente tres veces */
 (function () {
   const canvas = document.getElementById('canvas-nicto');
   const ctx = canvas.getContext('2d');
@@ -7,19 +7,31 @@
   const mouse = { x: 0.5, y: 0.5, inside: false };
 
   let objects = [];
+  const MESSAGE = 'NOESTASSOLO';
+  let letters = [];
+
   function scatter() {
     objects = [];
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 7; i++) {
       objects.push({
         x: 0.08 + Math.random() * 0.84,
         y: 0.12 + Math.random() * 0.76,
         type: Math.floor(Math.random() * 2)
       });
     }
+    // Letras del mensaje: posición y tinte nuevos en cada apagón
+    letters = MESSAGE.split('').map(ch => ({
+      ch,
+      x: 0.06 + Math.random() * 0.88,
+      y: 0.1 + Math.random() * 0.8,
+      hue: Math.random() < 0.7 ? 30 + Math.random() * 20 : 0,   // hueso o rojo
+      rot: (Math.random() - 0.5) * 0.5
+    }));
   }
   scatter();
 
   const entity = { x: 0.8, y: 0.5 };
+  let entityFinds = 0;
   let entityCooldown = 0;
 
   function relocateEntity() {
@@ -72,7 +84,6 @@
     const x = entity.x * w, y = entity.y * h;
     const s = 36 * dpr;
 
-    // Silueta NEGRA PURA: recorta la luz que hay detrás
     ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1, alpha * 2)})`;
     ctx.beginPath();
     ctx.arc(x, y - s * 1.15, s * 0.34, 0, Math.PI * 2);
@@ -84,7 +95,6 @@
     ctx.closePath();
     ctx.fill();
 
-    // Dos puntos rojos tenues: te está mirando
     if (alpha > 0.2) {
       ctx.fillStyle = `rgba(160, 15, 15, ${(alpha - 0.2) * 1.1})`;
       ctx.beginPath();
@@ -125,7 +135,6 @@
     const R = 130 * dpr * (0.85 + Math.sin(t * 0.01) * 0.08) * flicker;
 
     if (mouse.inside && R > 1) {
-      // 1. LA LUZ PRIMERO: ilumina el fondo
       const g = ctx.createRadialGradient(mx, my, 0, mx, my, R);
       g.addColorStop(0, `rgba(190, 175, 145, ${0.32 * flicker})`);
       g.addColorStop(0.55, `rgba(190, 175, 145, ${0.1 * flicker})`);
@@ -133,27 +142,42 @@
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
 
-      // 2. Los objetos, sobre el fondo iluminado
       for (const o of objects) {
         const d = Math.hypot(o.x * w - mx, o.y * h - my);
         const alpha = Math.max(0, 1 - d / R);
         if (alpha > 0.03) drawObject(o, w, h, dpr, alpha);
       }
 
-      // 3. EL ENTE: negro puro que recorta la luz (ahora sí visible)
+      // LETRAS DEL MENSAJE: solo visibles bajo la luz
+      for (const L of letters) {
+        const lx = L.x * w, ly = L.y * h;
+        const d = Math.hypot(lx - mx, ly - my);
+        const alpha = Math.max(0, 1 - d / R);
+        if (alpha > 0.05) {
+          ctx.save();
+          ctx.translate(lx, ly);
+          ctx.rotate(L.rot);
+          ctx.font = `${22 * dpr}px 'Special Elite', cursive`;
+          ctx.fillStyle = L.hue === 0
+            ? `rgba(150, 18, 18, ${alpha * 0.9})`
+            : `hsla(${L.hue}, 25%, 72%, ${alpha * 0.8})`;
+          ctx.fillText(L.ch, 0, 0);
+          ctx.restore();
+        }
+      }
+
       const de = Math.hypot(entity.x * w - mx, entity.y * h - my);
       const ea = Math.max(0, 1 - de / (R * 1.25));
       if (ea > 0.03) {
         drawEntity(w, h, dpr, ea);
         if (ea > 0.5 && t > entityCooldown) {
           entityCooldown = t + 1000;
-          if (window.terror) {
-            terror.hit();
-            terror.whisper();
-            terror.setTension(1);
-          }
+          entityFinds++;
+          if (window.terror) { terror.hit(); terror.whisper(); terror.setTension(1); }
           window.setCursorTense && setCursorTense(true);
-          setTimeout(relocateEntity, 220);   // se deja ver un instante y huye
+          setTimeout(relocateEntity, 220);
+          // RETO: encontrarlo 3 veces → letra A
+          if (entityFinds >= 3) riddle.grant(1);
         }
       }
     }

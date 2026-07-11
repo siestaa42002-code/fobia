@@ -457,3 +457,97 @@ body::after {
   #sound-panel { top: 0.8rem; right: 0.8rem; }
   .sound-options input[type="range"]::-webkit-slider-thumb { cursor: auto; }
 }
+
+/* ============ ACERTIJO ============ */
+
+#riddle-hud {
+  position: fixed;
+  bottom: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1500;
+  display: flex;
+  gap: 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+}
+
+#riddle-hud.hidden { display: none; }
+
+#riddle-hud span {
+  width: 1.6rem;
+  text-align: center;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--text-dim);
+  padding-bottom: 0.15rem;
+  transition: all 0.5s;
+}
+
+#riddle-hud span.found {
+  color: var(--blood-bright);
+  border-color: var(--blood-bright);
+  text-shadow: 0 0 12px rgba(196, 20, 20, 0.6);
+  animation: letter-in 0.6s;
+}
+
+@keyframes letter-in {
+  0% { transform: translateY(-14px) scale(1.6); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+#exit-riddle { margin-top: 2.5rem; display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+
+.exit-question { font-size: 0.95rem; color: var(--text-dim); }
+
+#exit-code {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--text-dim);
+  color: var(--bone);
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  letter-spacing: 0.6em;
+  text-align: center;
+  text-transform: uppercase;
+  width: 11ch;
+  outline: none;
+  padding: 0.3rem 0;
+}
+
+#exit-code:focus { border-color: var(--blood-bright); }
+
+#exit-try {
+  background: transparent;
+  border: 1px solid var(--text-dim);
+  color: var(--text);
+  font-family: var(--font-scare);
+  letter-spacing: 0.3em;
+  padding: 0.6rem 2rem;
+  transition: all 0.4s;
+}
+
+#exit-try:hover { border-color: var(--blood-bright); }
+
+#exit-result { font-family: var(--font-mono); font-size: 0.8rem; color: var(--blood-bright); min-height: 1.2em; }
+
+#freed {
+  position: fixed;
+  inset: 0;
+  background: #f2efe8;
+  color: #1a1815;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  z-index: 3000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 3s, visibility 3s;
+}
+
+#freed.show { opacity: 1; visibility: visible; }
+
+#freed h2 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 400; }
+#freed p { margin-top: 1rem; color: #6a655c; }

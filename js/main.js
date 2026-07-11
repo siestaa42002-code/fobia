@@ -1,8 +1,7 @@
 /* ============================================
-   main.js — gate, Lenis, GSAP, cursor, glitches
+   main.js — gate, scroll, cursor, glitches, acertijo
    ============================================ */
 
-// Helper global de canvas
 window.fitCanvas = function (canvas) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const rect = canvas.getBoundingClientRect();
@@ -15,7 +14,6 @@ window.fitCanvas = function (canvas) {
   return { w, h, dpr };
 };
 
-// .visible indica si el elemento está en pantalla; los bucles se pausan si es false
 window.watchVisible = function (el) {
   const state = { visible: false };
   new IntersectionObserver(entries => {
@@ -24,16 +22,18 @@ window.watchVisible = function (el) {
   return state;
 };
 
-/* ---------- Cursor personalizado ---------- */
+/* ---------- Cursor (con modo lento) ---------- */
 (function () {
   const cursor = document.getElementById('cursor');
   let cx = -100, cy = -100, tx = -100, ty = -100;
+  let slow = false;
 
   window.addEventListener('mousemove', e => { tx = e.clientX; ty = e.clientY; });
 
   function loop() {
-    cx += (tx - cx) * 0.35;
-    cy += (ty - cy) * 0.35;
+    const ease = slow ? 0.05 : 0.35;   // en modo lento, el cursor "pesa"
+    cx += (tx - cx) * ease;
+    cy += (ty - cy) * ease;
     cursor.style.left = cx + 'px';
     cursor.style.top = cy + 'px';
     requestAnimationFrame(loop);
@@ -41,20 +41,28 @@ window.watchVisible = function (el) {
   loop();
 
   window.setCursorTense = on => cursor.classList.toggle('tense', on);
+  window.setCursorSlow = on => slow = on;
 })();
 
-/* ---------- Glitch global aleatorio ---------- */
+/* ---------- Glitch global ---------- */
 (function () {
   const layer = document.getElementById('glitch-layer');
   let enabled = false;
+
+  // Flash a demanda (lo usa escopofobia)
+  window.glitchFlash = function () {
+    layer.classList.remove('flash');
+    void layer.offsetWidth;
+    layer.classList.add('flash');
+    setTimeout(() => layer.classList.remove('flash'), 250);
+  };
 
   function schedule() {
     const wait = 25000 + Math.random() * 45000;
     setTimeout(() => {
       if (enabled && document.visibilityState === 'visible') {
-        layer.classList.add('flash');
+        window.glitchFlash();
         if (window.terror) terror.glitch();
-        setTimeout(() => layer.classList.remove('flash'), 250);
       }
       schedule();
     }, wait);
@@ -64,7 +72,39 @@ window.watchVisible = function (el) {
   schedule();
 })();
 
-/* ---------- Gate: entrada y desbloqueo ---------- */
+/* ---------- Acertijo ---------- */
+window.riddle = (function () {
+  const WORD = 'SALIDA';
+  const found = new Array(WORD.length).fill(false);
+  const hud = document.getElementById('riddle-hud');
+
+  // Construye el HUD: _ _ _ _ _ _
+  WORD.split('').forEach(() => {
+    const s = document.createElement('span');
+    s.textContent = '_';
+    hud.appendChild(s);
+  });
+  const slots = hud.querySelectorAll('span');
+
+  return {
+    show() { hud.classList.remove('hidden'); },
+
+    grant(index) {
+      if (found[index]) return;
+      found[index] = true;
+      slots[index].textContent = WORD[index];
+      slots[index].classList.add('found');
+      if (window.terror) { terror.whisper(); terror.hit(); }
+      if (window.glitchFlash) glitchFlash();
+    },
+
+    check(value) {
+      return value.trim().toUpperCase() === WORD;
+    }
+  };
+})();
+
+/* ---------- Gate ---------- */
 (function () {
   const gate = document.getElementById('gate');
   const btn = document.getElementById('enter-btn');
@@ -73,19 +113,17 @@ window.watchVisible = function (el) {
 
   btn.addEventListener('click', async () => {
     if (window.terror) await terror.init();
-
     experience.classList.remove('hidden');
     soundPanel.classList.remove('hidden');
+    riddle.show();
     gate.classList.add('opened');
     window.enableGlitches();
-
     initScroll();
-
     if (window.terror) terror.setLevel(0);
   });
 })();
 
-/* ---------- Lenis + GSAP (se inicia al entrar) ---------- */
+/* ---------- Lenis + GSAP + salida ---------- */
 function initScroll() {
   const lenis = new Lenis({ duration: 1.6, smoothWheel: true });
 
@@ -105,22 +143,16 @@ function initScroll() {
 
     gsap.fromTo(header,
       { opacity: 0, x: -40 },
-      {
-        opacity: 1, x: 0, duration: 1.2, ease: 'power2.out',
-        scrollTrigger: { trigger: section, start: 'top 70%' }
-      }
+      { opacity: 1, x: 0, duration: 1.2, ease: 'power2.out',
+        scrollTrigger: { trigger: section, start: 'top 70%' } }
     );
-
     gsap.fromTo(stage,
       { opacity: 0, scale: 0.97 },
-      {
-        opacity: 1, scale: 1, duration: 1.6, ease: 'power2.out',
-        scrollTrigger: { trigger: section, start: 'top 60%' }
-      }
+      { opacity: 1, scale: 1, duration: 1.6, ease: 'power2.out',
+        scrollTrigger: { trigger: section, start: 'top 60%' } }
     );
   });
 
-  // Nivel de miedo global por sección
   const sections = document.querySelectorAll('.fear-section');
   const activate = new IntersectionObserver(entries => {
     entries.forEach(e => {
@@ -132,7 +164,6 @@ function initScroll() {
   }, { threshold: 0.4 });
   sections.forEach(s => activate.observe(s));
 
-  // Al llegar a la salida, el miedo baja
   const exit = document.getElementById('exit');
   new IntersectionObserver(entries => {
     entries.forEach(e => {
@@ -142,4 +173,28 @@ function initScroll() {
       }
     });
   }, { threshold: 0.5 }).observe(exit);
+
+  // Comprobación de la palabra
+  const codeInput = document.getElementById('exit-code');
+  const tryBtn = document.getElementById('exit-try');
+  const result = document.getElementById('exit-result');
+  const freed = document.getElementById('freed');
+
+  function attempt() {
+    if (riddle.check(codeInput.value)) {
+      freed.classList.add('show');
+      if (window.terror) {
+        terror.setLevel(0);
+        terror.setBus('general', 0.1);
+      }
+    } else {
+      result.textContent = 'No. Sigue buscando.';
+      if (window.terror) terror.hit();
+      if (window.glitchFlash) glitchFlash();
+      codeInput.value = '';
+      setTimeout(() => result.textContent = '', 2500);
+    }
+  }
+  tryBtn.addEventListener('click', attempt);
+  codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(); });
 }

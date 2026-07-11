@@ -23,6 +23,8 @@
     </div>
   </div>
 
+  <div id="riddle-hud" class="hidden"></div>
+
   <div id="glitch-layer"></div>
 
   <div id="gate">
@@ -157,10 +159,21 @@
     <footer id="exit">
       <h2>Puedes irte.</h2>
       <p>Pero ya sabes qué hay aquí abajo. Y eso no se olvida.</p>
+      <div id="exit-riddle">
+        <p class="exit-question">Escribe lo que has estado buscando:</p>
+        <input id="exit-code" type="text" maxlength="6" autocomplete="off" spellcheck="false">
+        <button id="exit-try">PROBAR</button>
+        <p id="exit-result"></p>
+      </div>
       <p class="credits">Sonido y visuales generados en tu navegador. Nada fue grabado. — 2026</p>
     </footer>
 
   </main>
+
+  <div id="freed" class="hidden">
+      <h2>Encontraste la salida.</h2>
+      <p>Esta vez.</p>
+    </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>

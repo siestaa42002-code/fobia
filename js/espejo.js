@@ -82,7 +82,7 @@
     trail.push({ x: mouse.x, y: mouse.y, t });
     while (trail.length > 90) trail.shift();
 
-    // Máquina de estados del reflejo
+   // Máquina de estados del reflejo
     nextEpisode -= 16;
     if (state === 'normal' && nextEpisode <= 0 && mouse.inside) {
       state = Math.random() < 0.5 ? 'lag' : 'betrayal';
@@ -96,7 +96,7 @@
         betrayals++;
         if (window.terror) terror.crack(0.7);
         if (betrayals <= 3) addCrack(w, h);
-        if (window.glitchFlash) {}
+        if (betrayals >= 3) riddle.grant(5);
       }
       state = 'normal';
       if (window.terror) terror.setTension(0.4);

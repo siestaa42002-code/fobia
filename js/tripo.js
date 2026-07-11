@@ -131,6 +131,8 @@
 
     if (window.terror) terror.setTension(Math.min(1, holes.length / MAX_HOLES) * 0.85);
 
+    if (holes.length >= MAX_HOLES) riddle.grant(3);
+
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
