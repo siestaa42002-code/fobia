@@ -23,17 +23,16 @@
   });
   canvas.addEventListener('pointerleave', () => mouse.inside = false);
 
-  function addCrack(w, h) {
-    // Grieta desde el centro del espejo
+  function addCrack() {
     const segs = [];
-    let x = 0.5 + (Math.random() - 0.5) * 0.1;
-    let y = 0.4 + Math.random() * 0.2;
+    let x = 0.62 + Math.random() * 0.28;   // dentro del espejo (mitad derecha)
+    let y = 0.25 + Math.random() * 0.5;
     let a = Math.random() * Math.PI * 2;
     for (let i = 0; i < 7; i++) {
       segs.push({ x, y });
       a += (Math.random() - 0.5) * 1.1;
-      x += Math.cos(a) * (0.04 + Math.random() * 0.06);
-      y += Math.sin(a) * (0.04 + Math.random() * 0.06);
+      x = Math.max(0.52, Math.min(0.98, x + Math.cos(a) * 0.05));
+      y = Math.max(0.05, Math.min(0.95, y + Math.sin(a) * 0.05));
     }
     cracks.push(segs);
   }
@@ -95,7 +94,7 @@
       if (state === 'betrayal') {
         betrayals++;
         if (window.terror) terror.crack(0.7);
-        if (betrayals <= 3) addCrack(w, h);
+        if (betrayals <= 3) addCrack();
         if (betrayals >= 3) riddle.grant(5);
       }
       state = 'normal';
@@ -132,14 +131,14 @@
     }
 
     // Grietas acumuladas
+    // Grietas acumuladas
     if (cracks.length) {
       ctx.strokeStyle = 'rgba(216, 211, 200, 0.35)';
       ctx.lineWidth = 1.2 * dpr;
       for (const segs of cracks) {
         ctx.beginPath();
         segs.forEach((p, i) => {
-          const px = (0.5 + p.x * 0.5) * w * (p.x > 1 ? 0 : 1) || (0.5 + Math.min(0.98, p.x) * 0.5) * w;
-          i === 0 ? ctx.moveTo((0.5 + p.x / 2) * w, p.y * h) : ctx.lineTo((0.5 + p.x / 2) * w, p.y * h);
+          i === 0 ? ctx.moveTo(p.x * w, p.y * h) : ctx.lineTo(p.x * w, p.y * h);
         });
         ctx.stroke();
       }

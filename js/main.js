@@ -31,7 +31,7 @@ window.watchVisible = function (el) {
   window.addEventListener('mousemove', e => { tx = e.clientX; ty = e.clientY; });
 
   function loop() {
-    const ease = slow ? 0.05 : 0.35;   // en modo lento, el cursor "pesa"
+    const ease = slow ? 0.05 : 0.35;
     cx += (tx - cx) * ease;
     cy += (ty - cy) * ease;
     cursor.style.left = cx + 'px';
@@ -49,7 +49,6 @@ window.watchVisible = function (el) {
   const layer = document.getElementById('glitch-layer');
   let enabled = false;
 
-  // Flash a demanda (lo usa escopofobia)
   window.glitchFlash = function () {
     layer.classList.remove('flash');
     void layer.offsetWidth;
@@ -72,19 +71,37 @@ window.watchVisible = function (el) {
   schedule();
 })();
 
-/* ---------- Acertijo ---------- */
+/* ---------- Acertijo (palabra ofuscada + validación por hash) ---------- */
 window.riddle = (function () {
-  const WORD = 'SALIDA';
-  const found = new Array(WORD.length).fill(false);
+  // La palabra NO existe en texto plano: bytes XOR con clave 42
+  const ENC = [121, 107, 102, 99, 110, 107];
+  const K = 42;
+  const dec = i => String.fromCharCode(ENC[i] ^ K);
+
+  const found = new Array(ENC.length).fill(false);
   const hud = document.getElementById('riddle-hud');
 
-  // Construye el HUD: _ _ _ _ _ _
-  WORD.split('').forEach(() => {
+  ENC.forEach(() => {
     const s = document.createElement('span');
     s.textContent = '_';
     hud.appendChild(s);
   });
   const slots = hud.querySelectorAll('span');
+
+  // Hash SHA-256 en hexadecimal
+  async function sha(text) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Hash objetivo: se calcula una sola vez a partir de la palabra decodificada
+  let targetHash = null;
+  async function ensureHash() {
+    if (targetHash) return;
+    let word = '';
+    for (let i = 0; i < ENC.length; i++) word += dec(i);
+    targetHash = await sha(word);
+  }
 
   return {
     show() { hud.classList.remove('hidden'); },
@@ -92,14 +109,17 @@ window.riddle = (function () {
     grant(index) {
       if (found[index]) return;
       found[index] = true;
-      slots[index].textContent = WORD[index];
+      slots[index].textContent = dec(index);
       slots[index].classList.add('found');
       if (window.terror) { terror.whisper(); terror.hit(); }
       if (window.glitchFlash) glitchFlash();
     },
 
-    check(value) {
-      return value.trim().toUpperCase() === WORD;
+    async check(value) {
+      await ensureHash();
+      const attempt = value.trim().toUpperCase();
+      if (attempt.length !== ENC.length) return false;
+      return (await sha(attempt)) === targetHash;
     }
   };
 })();
@@ -174,14 +194,20 @@ function initScroll() {
     });
   }, { threshold: 0.5 }).observe(exit);
 
-  // Comprobación de la palabra
+  // Comprobación de la palabra (asíncrona por el hash)
   const codeInput = document.getElementById('exit-code');
   const tryBtn = document.getElementById('exit-try');
   const result = document.getElementById('exit-result');
   const freed = document.getElementById('freed');
+  let checking = false;
 
-  function attempt() {
-    if (riddle.check(codeInput.value)) {
+  async function attempt() {
+    if (checking) return;
+    checking = true;
+    const ok = await riddle.check(codeInput.value);
+    checking = false;
+
+    if (ok) {
       freed.classList.add('show');
       if (window.terror) {
         terror.setLevel(0);

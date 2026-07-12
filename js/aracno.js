@@ -1,4 +1,4 @@
-/* Aracnofobia — arañas que acechan en embestidas */
+/* Aracnofobia — letra 1: aguanta inmóvil con una encima */
 (function () {
   const canvas = document.getElementById('canvas-aracno');
   const ctx = canvas.getContext('2d');
@@ -6,18 +6,22 @@
 
   const mouse = { x: 0.5, y: 0.5, inside: false };
   let lastMove = 0;
+  let lastT = 0;
 
   const spiders = [];
   for (let i = 0; i < 5; i++) {
+    const a = Math.random() * Math.PI * 2;
     spiders.push({
       x: 0.15 + Math.random() * 0.7, y: 0.15 + Math.random() * 0.7,
-      angle: Math.random() * Math.PI * 2,
-      speed: 0,
+      vx: Math.cos(a) * 0.001, vy: Math.sin(a) * 0.001,
       size: 10 + Math.random() * 14,
       legPhase: Math.random() * Math.PI * 2,
-      jitterT: 0,
-      lungeT: Math.floor(Math.random() * 60),   // ciclo embestida/pausa
-      lunging: false
+      wanderDir: a,
+      wanderT: Math.floor(Math.random() * 80),
+      lungeT: Math.floor(Math.random() * 60),
+      lunging: false,
+      // Watchdog: posición de referencia y contador
+      wdX: 0, wdY: 0, wdT: 90
     });
   }
 
@@ -34,11 +38,13 @@
   function drawSpider(s, w, h, dpr, threat) {
     const x = s.x * w, y = s.y * h;
     const size = s.size * dpr;
+    const angle = Math.atan2(s.vy, s.vx);
+    const speed = Math.hypot(s.vx, s.vy);
     const bodyCol = `rgba(18, 14, 12, ${0.75 + threat * 0.25})`;
 
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(s.angle + Math.PI / 2);
+    ctx.rotate(angle + Math.PI / 2);
 
     ctx.strokeStyle = bodyCol;
     ctx.lineWidth = Math.max(1, size * 0.09);
@@ -47,7 +53,7 @@
       const side = i < 4 ? -1 : 1;
       const idx = i % 4;
       const baseA = side * (0.5 + idx * 0.42);
-      const walk = Math.sin(s.legPhase + idx * 1.7 + (side > 0 ? Math.PI : 0)) * 0.25 * (s.speed * 600 + 0.3);
+      const walk = Math.sin(s.legPhase + idx * 1.7 + (side > 0 ? Math.PI : 0)) * 0.25 * (speed * 600 + 0.3);
 
       const hipX = Math.cos(baseA) * size * 0.5 * side * -1;
       const hipY = Math.sin(baseA) * size * 0.5 - idx * size * 0.14 + size * 0.2;
@@ -83,7 +89,12 @@
   }
 
   function loop(t) {
-    if (!vis.visible) { requestAnimationFrame(loop); return; }
+    if (!vis.visible) { lastT = t; requestAnimationFrame(loop); return; }
+
+    // Delta de tiempo normalizado (1 = frame de 60 fps).
+    // Si el navegador ahorra frames, el movimiento se compensa.
+    const dt = Math.min(3, (t - lastT) / 16.67 || 1);
+    lastT = t;
 
     const { w, h, dpr } = fitCanvas(canvas);
 
@@ -109,56 +120,83 @@
 
     for (const s of spiders) {
       const dx = mouse.x - s.x, dy = mouse.y - s.y;
-      const dist = Math.hypot(dx, dy);
+      const dist = Math.hypot(dx, dy) || 0.001;
+
+      let fx = 0, fy = 0, maxSpeed;
 
       if (mouse.inside && still > 0.08) {
-        // ACECHO EN EMBESTIDAS: pausa → carrera corta hacia ti → pausa
-        const targetA = Math.atan2(dy, dx);
-        let da = targetA - s.angle;
-        while (da > Math.PI) da -= Math.PI * 2;
-        while (da < -Math.PI) da += Math.PI * 2;
-        s.angle += da * 0.09;
-
-        s.lungeT--;
+        s.lungeT -= dt;
         if (s.lungeT <= 0) {
           s.lunging = !s.lunging;
-          // Embestida: 15-25 frames; pausa: 30-80 frames (más corta si estás muy quieto)
-          s.lungeT = s.lunging
-            ? 15 + Math.floor(Math.random() * 10)
-            : Math.floor((30 + Math.random() * 50) * (1.2 - still));
+          s.lungeT = s.lunging ? 18 + Math.random() * 10 : 25 + Math.random() * 35 * (1.2 - still);
           if (s.lunging && dist < 0.35 && window.terror) terror.skitter(0.6);
         }
-        s.speed = s.lunging ? 0.0035 + still * 0.002 : 0.0002;
+        maxSpeed = s.lunging ? 0.005 + still * 0.002 : 0.0012;
+        fx = (dx / dist) * maxSpeed;
+        fy = (dy / dist) * maxSpeed;
       } else if (mouse.inside && dist < 0.3) {
-        s.angle = Math.atan2(-dy, -dx) + (Math.random() - 0.5) * 0.6;
-        s.speed = 0.004;
+        maxSpeed = 0.005;
+        fx = (-dx / dist) * maxSpeed;
+        fy = (-dy / dist) * maxSpeed;
         s.lunging = false;
         if (dist < 0.2 && window.terror) terror.skitter(0.8);
       } else {
-        s.jitterT -= 1;
-        if (s.jitterT <= 0) {
-          s.angle += (Math.random() - 0.5) * 1.4;
-          s.jitterT = 40 + Math.random() * 100;
+        s.wanderT -= dt;
+        if (s.wanderT <= 0) {
+          s.wanderDir = Math.atan2(s.vy, s.vx) + (Math.random() - 0.5) * 1.6;
+          s.wanderT = 40 + Math.random() * 90;
         }
-        s.speed = 0.0006 + Math.random() * 0.0003;
+        maxSpeed = 0.001;
+        fx = Math.cos(s.wanderDir) * maxSpeed;
+        fy = Math.sin(s.wanderDir) * maxSpeed;
       }
 
-      s.x += Math.cos(s.angle) * s.speed;
-      s.y += Math.sin(s.angle) * s.speed;
+      s.vx += (fx - s.vx) * 0.12 * dt;
+      s.vy += (fy - s.vy) * 0.12 * dt;
 
-      if (s.x <= 0.03 || s.x >= 0.97) {
-        s.angle = Math.PI - s.angle + (Math.random() - 0.5) * 0.5;
-        s.x = Math.max(0.031, Math.min(0.969, s.x));
-        s.jitterT = 30;
-      }
-      if (s.y <= 0.03 || s.y >= 0.97) {
-        s.angle = -s.angle + (Math.random() - 0.5) * 0.5;
-        s.y = Math.max(0.031, Math.min(0.969, s.y));
-        s.jitterT = 30;
+      // Velocidad mínima garantizada
+      const sp = Math.hypot(s.vx, s.vy);
+      if (sp < 0.0006) {
+        const a = Math.random() * Math.PI * 2;
+        s.vx = Math.cos(a) * 0.0009;
+        s.vy = Math.sin(a) * 0.0009;
+        s.wanderDir = a;
       }
 
-      s.legPhase += 0.12 + s.speed * 90;
-      if (dist < 0.12) anyClose = true;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+
+      // Rebote vectorial
+      if (s.x <= 0.03) { s.x = 0.031; s.vx = Math.abs(s.vx); s.wanderDir = 0; s.wanderT = 20; }
+      if (s.x >= 0.97) { s.x = 0.969; s.vx = -Math.abs(s.vx); s.wanderDir = Math.PI; s.wanderT = 20; }
+      if (s.y <= 0.03) { s.y = 0.031; s.vy = Math.abs(s.vy); s.wanderDir = Math.PI / 2; s.wanderT = 20; }
+      if (s.y >= 0.97) { s.y = 0.969; s.vy = -Math.abs(s.vy); s.wanderDir = -Math.PI / 2; s.wanderT = 20; }
+
+      // WATCHDOG: si en ~1.5 s no se desplazó, patada con rumbo nuevo.
+      // También cura estados corruptos (NaN) restaurando la posición.
+      s.wdT -= dt;
+      if (s.wdT <= 0) {
+        if (!isFinite(s.x) || !isFinite(s.y)) {
+          s.x = 0.2 + Math.random() * 0.6;
+          s.y = 0.2 + Math.random() * 0.6;
+        }
+        const moved = Math.hypot(s.x - s.wdX, s.y - s.wdY);
+        if (moved < 0.012) {
+          const a = Math.random() * Math.PI * 2;
+          s.vx = Math.cos(a) * 0.0025;
+          s.vy = Math.sin(a) * 0.0025;
+          s.wanderDir = a;
+          s.wanderT = 50;
+          s.lunging = true;
+          s.lungeT = 15;
+        }
+        s.wdX = s.x;
+        s.wdY = s.y;
+        s.wdT = 90;
+      }
+
+      s.legPhase += (0.1 + Math.hypot(s.vx, s.vy) * 80) * dt;
+      if (dist < 0.1) anyClose = true;
 
       const threat = Math.max(still, s.lunging ? 0.5 : 0) * Math.max(0, 1 - dist * 2.2);
       drawSpider(s, w, h, dpr, threat);
@@ -168,6 +206,8 @@
       terror.skitter(still);
       if (still > 0.85) terror.whisper();
     }
+
+    if (anyClose && still >= 0.98) riddle.grant(0);
 
     requestAnimationFrame(loop);
   }
