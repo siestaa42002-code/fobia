@@ -129,8 +129,7 @@
     if (mouse.inside && reflex.x > 0.5) {
       drawDot(reflex.x, reflex.y, w, h, dpr, true, state === 'betrayal');
     }
-
-    // Grietas acumuladas
+    
     // Grietas acumuladas
     if (cracks.length) {
       ctx.strokeStyle = 'rgba(216, 211, 200, 0.35)';

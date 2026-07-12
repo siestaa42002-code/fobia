@@ -20,6 +20,9 @@
       wanderT: Math.floor(Math.random() * 80),
       lungeT: Math.floor(Math.random() * 60),
       lunging: false,
+      // Sentidos estables: si se recalculan cada frame se invierten y la araña vibra sin avanzar
+      orbitDir: Math.random() < 0.5 ? -1 : 1,
+      slideDir: 0,
       // Watchdog: posición de referencia y contador
       wdX: 0, wdY: 0, wdT: 90
     });
@@ -119,7 +122,11 @@
     let anyClose = false;
 
     for (const s of spiders) {
-      const dx = mouse.x - s.x, dy = mouse.y - s.y;
+      // El objetivo se mantiene dentro del área transitable: un cursor pegado al borde es
+      // inalcanzable (el rebote las frena antes) y acaban raspando la pared sin avanzar.
+      const tgtX = Math.min(0.9, Math.max(0.1, mouse.x));
+      const tgtY = Math.min(0.9, Math.max(0.1, mouse.y));
+      const dx = tgtX - s.x, dy = tgtY - s.y;
       const dist = Math.hypot(dx, dy) || 0.001;
 
       let fx = 0, fy = 0, maxSpeed;
@@ -132,8 +139,14 @@
           if (s.lunging && dist < 0.35 && window.terror) terror.skitter(0.6);
         }
         maxSpeed = s.lunging ? 0.005 + still * 0.002 : 0.0012;
-        fx = (dx / dist) * maxSpeed;
-        fy = (dy / dist) * maxSpeed;
+        if (dist < 0.06) {
+          // Ya está encima: rodea. Si sigue empujando radialmente se amontona y parece quieta.
+          fx = (-dy / dist) * maxSpeed * s.orbitDir;
+          fy = (dx / dist) * maxSpeed * s.orbitDir;
+        } else {
+          fx = (dx / dist) * maxSpeed;
+          fy = (dy / dist) * maxSpeed;
+        }
       } else if (mouse.inside && dist < 0.3) {
         maxSpeed = 0.005;
         fx = (-dx / dist) * maxSpeed;
@@ -149,6 +162,39 @@
         maxSpeed = 0.001;
         fx = Math.cos(s.wanderDir) * maxSpeed;
         fy = Math.sin(s.wanderDir) * maxSpeed;
+      }
+
+      // Bordes: repulsión + deslizamiento. Huir en línea recta hacia una pared clavaba a la
+      // araña contra ella (la fuerza empujaba fuera, el rebote empujaba dentro, y se anulaban).
+      const MARGIN = 0.14;
+      let bx = 0, by = 0;
+      if (s.x < MARGIN) bx += (MARGIN - s.x) / MARGIN;
+      if (s.x > 1 - MARGIN) bx -= (s.x - (1 - MARGIN)) / MARGIN;
+      if (s.y < MARGIN) by += (MARGIN - s.y) / MARGIN;
+      if (s.y > 1 - MARGIN) by -= (s.y - (1 - MARGIN)) / MARGIN;
+      // Si el cursor está pegado a la pared, la repulsión se desvanece al llegar a él: si no,
+      // empuje de pared y acecho se anulan y la araña tiembla en la esquina. El rebote la contiene.
+      const wall = Math.min(1, dist / 0.12);
+      fx += bx * wall * maxSpeed * 1.8;
+      fy += by * wall * maxSpeed * 1.8;
+
+      if (!bx && !by) s.slideDir = 0;
+
+      let fm = Math.hypot(fx, fy);
+      if ((bx || by) && wall > 0.5 && fm < maxSpeed * 0.35) {
+        // La huida apunta justo contra la pared: correr en paralelo a ella, no contra ella.
+        // El sentido se fija al empezar a deslizar y se mantiene hasta salir del margen.
+        const bn = Math.hypot(bx, by);
+        const tanX = -by / bn, tanY = bx / bn;
+        if (!s.slideDir) s.slideDir = tanX * s.vx + tanY * s.vy < 0 ? -1 : 1;
+        fx = tanX * maxSpeed * s.slideDir;
+        fy = tanY * maxSpeed * s.slideDir;
+        fm = maxSpeed;
+      }
+      // La dirección puede cambiar; el módulo de la velocidad objetivo nunca es cero.
+      if (fm > 1e-6) {
+        fx = (fx / fm) * maxSpeed;
+        fy = (fy / fm) * maxSpeed;
       }
 
       s.vx += (fx - s.vx) * 0.12 * dt;
